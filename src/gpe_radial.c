@@ -13,17 +13,15 @@ double __gpe_solve_calc_integral(const QuickFunction* chi2, uint nr_1, uint nr_2
         //util_error(qf1 == NULL, "NULL pointer from bessel_get_qf(nr_1)\n");
         //util_error(qf2 == NULL, "NULL pointer from bessel_get_qf(nr_2)\n");
         QuickFunction ifun;
-        //printf("Before!\n"); fflush(stdout);
         for (uint i = 0; i < QF_ARR_LEN; ++i) {
                 const double v1 = qf1.arr[i];
                 const double v2 = qf2.arr[i];
                 ifun.arr[i] = chi2->arr[i] * v1 * v2;
         }
-        //printf("After!\n"); fflush(stdout);
         return qf_integrate(&ifun);
 }
 
-BesselLinear gpe_solve_m1(double gN, double* mi) {
+BesselLinear gpe_solve_m1(double gN, double* mu, double* Epp) {
         const uint s = BESSEL_LINEAR_COMB_MAX_SIZE;
         BesselLinear ret = {
                 .size = s,
@@ -44,7 +42,7 @@ BesselLinear gpe_solve_m1(double gN, double* mi) {
 
         double H[s*s];
         double diff = 1.0;
-        *mi = 1.0;
+        *mu = 1.0;
         double mis[s];
 
         uint counter = 1;
@@ -53,15 +51,15 @@ BesselLinear gpe_solve_m1(double gN, double* mi) {
                 for (uint n = 0; n < s; ++n) {
                         for (uint m = n; m < s; ++m) {
                                 double itgr = __gpe_solve_calc_integral(&qf_chi2, ret.nrs[n], ret.nrs[m]);
-                                H[n*s+m] = gN*itgr;
+                                H[n*s+m] = 2*M_PI*gN*itgr;
                         }
                         H[n*s+n] += fock_single_energy(ret.nrs[n], STATE_BESSEL);
                 }
 
                 LAPACKE_dsyev(LAPACK_ROW_MAJOR, 'V', 'U', s, H, s, mis);
 
-                diff = fabs((mis[0]-*mi)/(*mi));
-                *mi = mis[0];
+                diff = fabs((mis[0]-*mu)/(*mu));
+                *mu = mis[0];
                 for (uint i = 0; i < s; ++i)
                         ret.w[i] = H[i*s];
 
@@ -76,7 +74,7 @@ BesselLinear gpe_solve_m1(double gN, double* mi) {
                         qf_chi2.arr[i] = 0.5*val*val + 0.5*qf_chi2.arr[i];
                 }
 
-                printf("# %5u:\tmi = %lf\tdiff = %e\n", counter, *mi, diff);
+                printf("# %5u:\tmu = %lf\tdiff = %e\n", counter, *mu, diff);
                 ++counter;
         }
 
@@ -91,14 +89,14 @@ BesselLinear gpe_solve_m1(double gN, double* mi) {
                 for (uint n = 0; n < s; ++n) {
                         for (uint m = n; m < s; ++m) {
                                 double itgr = __gpe_solve_calc_integral(&qf_chi2, ret.nrs[n], ret.nrs[m]);
-                                H[n*s+m] = sqrt(2*M_PI)*gN*itgr;
+                                H[n*s+m] = 2*M_PI*gN*itgr;
                         }
                         H[n*s+n] += fock_single_energy(ret.nrs[n], STATE_BESSEL);
                 }
 
                 LAPACKE_dsyev(LAPACK_ROW_MAJOR, 'V', 'U', s, H, s, mis);
 
-                *mi = mis[0];
+                *mu = mis[0];
                 for (uint j = 0; j < s; ++j)
                         ret.w[j] = H[j*s];
 
@@ -113,16 +111,23 @@ BesselLinear gpe_solve_m1(double gN, double* mi) {
                         qf_chi2.arr[i] = frac[i]*val*val + (1.0-frac[i])*qf_chi2.arr[i];
                 }
 
-                printf("# %5u:\tmi = %lf\n", i, *mi);
+                printf("# %5u:\tmu = %lf\n", i, *mu);
         }
 
+        for (uint i = 0; i < QF_ARR_LEN; ++i)
+                qf_chi2.arr[i] *= qf_chi2.arr[i];
+
+        double eshift = M_PI*gN*qf_integrate(&qf_chi2); 
+        *Epp = *mu - eshift;
         printf("# GPE: SELF-CONSISTANT DONE\n");
+        printf("# GPE: mu = %lf,    Epp = %lf\n", *mu, *Epp);
         
         if (ret.w[0] > 0)
                 return ret;
 
         for (uint i = 0; i < s; ++i)
                 ret.w[i] *= -1;
+
         return ret;
 }
 
@@ -138,26 +143,27 @@ QuickFunction gpe_bes_lin_get_qf(const BesselLinear* bl) {
 }
 
 static double __bdg_hamiltonian_elem(const QuickFunction* chi2, UVBesselState l, UVBesselState r) {
+        const double integral = 2 * M_PI * __gpe_solve_calc_integral(chi2, l.nr, r.nr);
         if (l.isUp && r.isUp)
-                return 4 * M_PI * __gpe_solve_calc_integral(chi2, l.nr, r.nr);
+                return 2 * integral;
         if ((!l.isUp) && (!r.isUp))
-                return -4 * M_PI * __gpe_solve_calc_integral(chi2, l.nr, r.nr);
+                return -2 * integral;
         if ((!l.isUp) && r.isUp)
-                return -2 * M_PI * __gpe_solve_calc_integral(chi2, l.nr, r.nr);
-        return 2 * M_PI * __gpe_solve_calc_integral(chi2, l.nr, r.nr);
+                return -integral;
+        return integral;
 }
 
 
 UVSol bdg_solve(uint half_size, int m, double gN, double omega) {
         const uint size = 2 * half_size;
-        double mi;
-        BesselLinear blin = gpe_solve_m1(gN, &mi);
+        double mu, Epp;
+        BesselLinear blin = gpe_solve_m1(gN, &mu, &Epp);
         QuickFunction chi2 = gpe_bes_lin_get_qf(&blin);
         for (uint i = 0; i < QF_ARR_LEN; ++i) {
                 chi2.arr[i] *= chi2.arr[i];
         }
 
-        /* Define the states, fill Hamiltonian */
+        /* Define the states, fill non-iteraction part of Hamiltonian */
         double H[size*size];
         memset(H, 0, sizeof(*H)*size*size);
         UVSol sol = {
@@ -169,8 +175,8 @@ UVSol bdg_solve(uint half_size, int m, double gN, double omega) {
         };
         for (uint i = 0; i < half_size; ++i) {
                 BesselWaveState ubws = fock_bessel_state_direct(m+2, i+1);
-                uint uidx = fock_bessel_find_index(ubws);
                 BesselWaveState lbws = fock_bessel_state_direct(m, i+1);
+                uint uidx = fock_bessel_find_index(ubws);
                 uint lidx = fock_bessel_find_index(lbws);
 
                 sol.types[i].isUp = true;
@@ -178,8 +184,8 @@ UVSol bdg_solve(uint half_size, int m, double gN, double omega) {
                 sol.types[i+half_size].isUp = false;
                 sol.types[i+half_size].nr = lidx;
 
-                H[i*size + i] = fock_single_energy(uidx, STATE_BESSEL) - omega*(m+2) - mi;
-                H[(i+half_size)*size + (i+half_size)] = -fock_single_energy(lidx, STATE_BESSEL) + omega*m + mi;
+                H[i*size + i] = fock_single_energy(uidx, STATE_BESSEL) - omega*(m+2) - mu;
+                H[(i+half_size)*size + (i+half_size)] = -fock_single_energy(lidx, STATE_BESSEL) + omega*m + mu;
         }
 
         /* Fill Interaction part */
@@ -194,17 +200,6 @@ UVSol bdg_solve(uint half_size, int m, double gN, double omega) {
         double wi[size];
         double vr[size*size];
         LAPACKE_dgeev(LAPACK_ROW_MAJOR, 'N', 'V', size, H, size, wr, wi, NULL, size, vr, size);
-
-        // for (uint i = 0; i < size; ++i) {
-        //         double sum = 0.0;
-        //         for (uint j = 0; j < size; ++j) {
-        //                 double v = vr[j*size + i];
-        //                 v *= v;
-        //                 sum += v;
-        //         }
-        //         printf("SUM: %lf\n", sum);
-        // }
-
 
         /* Save the solution */
         for (uint i = 0; i < size; ++i) {
@@ -235,7 +230,8 @@ UVSol bdg_solve(uint half_size, int m, double gN, double omega) {
                         else
                                 mf += v;
                 }
-                if (pf > mf)
+                double pmi = pf - mf;
+                if (pmi > 0)
                         sol.plus_family[i] = true;
                 else
                         sol.plus_family[i] = false;

@@ -27,7 +27,7 @@ typedef struct {
         bool* plus_family;
 } UVSol;
 
-BesselLinear gpe_solve_m1(double gN, double* mi);
+BesselLinear gpe_solve_m1(double gN, double* mi, double* Epp);
 QuickFunction gpe_bes_lin_get_qf(const BesselLinear* bl);
 
 UVSol bdg_solve(uint half_size, int m, double gN, double omega);
