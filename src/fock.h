@@ -9,7 +9,7 @@
 
 typedef unsigned int uint;
 
-#define FOCK_CONFIG_STATE_CAPACITY 20 /* Max number of particles in fock state */
+#define FOCK_CONFIG_STATE_CAPACITY 6 /* Max number of particles in fock state */
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
 

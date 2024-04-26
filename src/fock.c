@@ -1008,6 +1008,17 @@ double* fock_coeffstateset_alloc_random(FockCoeffStateSet cset, uint n) {
         return p;
 }
 
+double complex bessel_g1_compute_rphi(G1State* g1, double r, double phi, double rp, double phip) {
+        double complex ret = 0.0;
+        //#pragma omp parallel for reduction(+:ret)
+        for (uint n = 0; n < g1->size; ++n) {
+                double complex v = conj(bessel_value(g1->is[n], r, phi));
+                v *= bessel_value(g1->js[n], rp, phip);
+                ret += g1->coeff[n]*v;
+        }
+        return ret;
+}
+
 double complex fock_g1_compute(G1State* g1, double x, double y, double xp, double yp) {
         double complex ret = 0.0;
         //#pragma omp parallel for reduction(+:ret)
@@ -1019,9 +1030,15 @@ double complex fock_g1_compute(G1State* g1, double x, double y, double xp, doubl
         return ret;
 }
 
-/* === Way of drawing one random element === */
+static uint __bsearch_double(double key, double* arr, uint n) {
+        for (uint i = 0; i < n; ++i)
+                if (key <= arr[i])
+                        return i;
 
-static uint __bsearch_dobule(double key, double* arr, uint n) {
+        return n-1;
+
+        // This binary search is not working,
+        // but this unimportant, it would not be quicker
         uint low = 0;
         uint high = n;
         while ((high-low) > 1) {
@@ -1034,11 +1051,59 @@ static uint __bsearch_dobule(double key, double* arr, uint n) {
         return low;
 }
 
+/* Based of CDF (may be unnormalized) raturns values from [0, len-1] */
+static inline uint __arr_rand(double* arr, uint len) {
+        const double r = arr[len-1] * rand() / RAND_MAX;
+        return __bsearch_double(r, arr, len);
+}
+
+#define _G1_NR   40
+#define _G1_NPHI 40
+static double integral_r[_G1_NR];
+static double integrals_phi[_G1_NPHI*_G1_NR];
+
+Vec2d fock_g1_rand(G1State* g1, FockG1RandOpt opt) {
+        util_error(g1->type != STATE_BESSEL, "Drawing from g1 other than bessel state is not supported.\n");
+        const double dr   = 1.0 / _G1_NR;
+        const double dphi = 2.0 * M_PI / _G1_NPHI;
+
+        /* Only if proper option is set, we recalculate the integral */
+        if (opt == FOCK_G1_RAND_RELOAD) {
+                double rsum = 0.0;
+                for (uint i = 0; i < _G1_NR; ++i) {
+                        const double r = (i+0.5)*dr; 
+                        double sum = 0.0;
+                        for (uint j = 0; j < _G1_NPHI; ++j) {
+                                const double phi = (j+0.5)*dphi; 
+                                sum += creal(bessel_g1_compute_rphi(g1, r, phi, r, phi));
+                                integrals_phi[i*_G1_NR+j] = sum;
+                        }
+                        rsum += sum;
+                        integral_r[i] = rsum;
+                }
+        }
+
+        /* Drawing random point */
+        uint nr = __arr_rand(integral_r, _G1_NR);
+        uint nphi = __arr_rand(&integrals_phi[nr*_G1_NR], _G1_NPHI);
+        double r   =   dr * (nr   + ((double)rand()/RAND_MAX));
+        double phi = dphi * (nphi + ((double)rand()/RAND_MAX));
+
+        Vec2d ret = {
+                .x = r*cos(phi),
+                .y = r*sin(phi),
+        };
+
+        return ret;
+}
+
+#if 0
+
 #define _G1_NX 40
 #define _G1_NY 40
 double integral[_G1_NX*_G1_NY+1];
 
-Vec2d fock_g1_rand(G1State* g1, FockG1RandOpt opt) {
+Vec2d __old_fock_g1_rand_(G1State* g1, FockG1RandOpt opt) {
         util_error(g1->type != STATE_BESSEL, "Drawing from g1 other than bessel state is not supported.\n");
         const double dx = 2.0 / _G1_NX;
         const double dy = 2.0 / _G1_NY;
@@ -1061,7 +1126,7 @@ Vec2d fock_g1_rand(G1State* g1, FockG1RandOpt opt) {
 
         /* Drawing random point */
         double r = integral[ncells] * rand() / RAND_MAX;
-        ij = __bsearch_dobule(r, integral, ncells);
+        ij = __bsearch_double(r, integral, ncells);
         double diff = integral[ij+1] - integral[ij];
         double ddx = 0.0;
         if (diff > 0.0)
@@ -1079,6 +1144,8 @@ Vec2d fock_g1_rand(G1State* g1, FockG1RandOpt opt) {
 
         return ret;
 }
+
+#endif
 
 void fock_g1_free(G1State* g1) {
         free(g1->is);

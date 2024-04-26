@@ -147,23 +147,21 @@ const QuickFunction* bessel_get_qf(uint nr) {
 }
 
 /* params - uint-s with indexes of bessel functions */
-static double __bessel_value_bessel_quadruple(double r, void* params) {
-        double ret = r;
-        for (uint i = 0; i < 4; ++i)
-                ret *= bessel_value_radial(((uint*)params)[i], r);
-        return ret;
-}
+// static double __bessel_value_bessel_quadruple(double r, void* params) {
+//         double ret = r;
+//         for (uint i = 0; i < 4; ++i)
+//                 ret *= bessel_value_radial(((uint*)params)[i], r);
+//         return ret;
+// }
 
 static double __bessel_quadruple_integral(uint s1, uint s2, uint s3, uint s4) {
-        gsl_integration_workspace* w = gsl_integration_workspace_alloc(1000);
-        gsl_function func;
-        uint params[4] = { s1, s2, s3, s4 };
-        func.function = __bessel_value_bessel_quadruple;
-        func.params = params;
-        double result, error;
-        gsl_integration_qags(&func, 0, 1, 0, 1e-7, 1000, w, &result, &error);
-        gsl_integration_workspace_free(w);
-        return result;
+        QuickFunction iqf = *bessel_get_qf(s1);
+        const QuickFunction* qf1 = bessel_get_qf(s2);
+        const QuickFunction* qf2 = bessel_get_qf(s3);
+        const QuickFunction* qf3 = bessel_get_qf(s4);
+        for (uint i = 0; i < QF_ARR_LEN; ++i)
+                iqf.arr[i] *= qf1->arr[i] * qf2->arr[i] * qf3->arr[i];
+        return qf_integrate(&iqf);
 }
 
 double __bessel_matrix_element_delta_potential(const FockState* left, const FockState* right) {

@@ -1,65 +1,34 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <tgmath.h>
+#include "src/util.h"
 #include "src/fock.h"
-#include <gsl/gsl_sf_bessel.h>
-#include "src/gpe_radial.h"
+#include <math.h>
 
 int main(int argc, char **argv) {
-        double omega = 0.0;
-        //double mu, Epp;
-        //BesselLinear blin = gpe_solve_m1(5.0*2.0, &mu, &Epp);
-        //printf("radial: mu = %lf, E=%lf   vs   grid: %lf\n", 6.0*mu, 6.0*Epp, 58.109);
-        //return 0;
-        if (argc > 1)
-                sscanf(argv[1], "%lf", &omega);
-        //FILE* f_out = fopen("./results/data/energies/gpe-selfconsistent.txt", "w");
-        uint size = 20;
-        UVSol sol = bdg_solve(size, -2, 5*3.0, omega);
-        for (uint i = 0; i < sol.size; ++i) {
-                //printf("%15e    %15e\n", creal(sol.evals[i]), cimag(sol.evals[i]));
-        }
-        putchar('\n');
-        printf("# ==================== PLUS FAMILY ======================== #\n");
-        for (uint i = 0; i < 2*size; ++i) {
-                if (!sol.plus_family[i])
-                        continue;
-                if (cimag(sol.evals[i]) == 0.0)
-                        printf("%15lf\n", creal(sol.evals[i]));
-                else
-                        printf("(%15lf + %lfi)\n", creal(sol.evals[i]), cimag(sol.evals[i]));
-                for (uint j = 0; j < sol.size; ++j) {
-                        double v = cabs(sol.evecs[j*sol.size + i]);
-                        v *= v;
-                        BesselWaveState bws = fock_bessel_state_index(sol.types[j].nr);
-                        if (v > 0.01) {
-                                printf("\t%lf:   m:%d r:%d\n", v, bws.m, bws.zero_num);
-                        }
-                }
-                putchar('\n');
-        }
-        putchar('\n');
-        printf("# ==================== MINUS FAMILY ======================= #\n");
-        for (uint i = 0; i < 2*size; ++i) {
-                if (sol.plus_family[i])
-                        continue;
-                if (cimag(sol.evals[i]) == 0.0)
-                        printf("%15lf\n", creal(sol.evals[i]));
-                else
-                        printf("(%15lf + %lfi)\n", creal(sol.evals[i]), cimag(sol.evals[i]));
-                for (uint j = 0; j < sol.size; ++j) {
-                        double v = cabs(sol.evecs[j*sol.size + i]);
-                        v *= v;
-                        BesselWaveState bws = fock_bessel_state_index(sol.types[j].nr);
-                        if (v > 0.01) {
-                                printf("\t%lf:   m:%d r:%d\n", v, bws.m, bws.zero_num);
-                        }
-                }
-                putchar('\n');
-        }
-        //fclose(f_out);
 
+        for (uint i = 0; i < 200; ++i) {
+                double ener = fock_single_energy(i, STATE_BESSEL);
+                printf("%4u: %10lf\n", i, ener);
+        }
+        return 0;
+        uint npart = 6;
+        FockStateSet set = fock_stateset_alloc_same_angular_momentum(6, 100.0, 400, npart);
+        printf("# set.size = %u\n", set.size);
+        // return 0;
+        EigenSolutionSet sol = fock_eigen_solve(3.0, set);
+        FockCoeffStateSet cset = fock_coeffstateset_alloc_dcoeff(set, sol.vectors, 1.0e-4);
+        uint ndraws = 16;
+        double* pos = fock_coeffstateset_alloc_random(cset, ndraws);
+
+        for (uint i = 0; i < ndraws; ++i) {
+                for (uint j = 0; j < npart; ++j) {
+                        double x = pos[i*(2*npart)+j];
+                        double y = pos[i*(2*npart)+j+npart];
+                        printf("%lf %lf\n", x, y);
+                }
+        }
+
+        free(pos);
+        fock_coeffstateset_free(&cset);
+        fock_stateset_free(&set);
 	return 0;
 }
 
