@@ -1,8 +1,7 @@
 #ifndef _GPE_RADIAL_H_
 #define _GPE_RADIAL_H_
+#include "quick_function.h"
 #include "fock.h"
-#include <stdbool.h>
-#include <complex.h>
 
 #define BESSEL_LINEAR_COMB_MAX_SIZE 30
 

@@ -11,3 +11,19 @@ GPE for centered vortex in cylinder. Currenty working on simple BdG solver fot v
 * Solution to GPE from previous points can be used in BdG equation (WIP).
 
 For bit more details contact publication: ... (WIP).
+
+In the code states are heandled in different ways, for single-particle:
+* Eigenstates of single-particle Hamiltonian (Bessel's with phase factor) are reference using indexes from 0,
+  call state_info(state_nr) to get StateInfo structure with additional information about given state.
+* Basis:     Holds indexes to single-particle states.
+* State:     Holds Basis and coefficients of linear combination of them.
+
+And for many-body we use structures:
+* Fock:      Eigenstates of many-body Hamiltonian without interaction.
+* FockBasis: Holds many 'Fock' (not linear combination, just array of different states)
+* FockState: Holds FockBasis and coefficients of linear combination of them.
+
+# Examples
+
+ DIRECTORY: The are outdated, to be deleted, don't use them.
+EXAMPLES.c: Those are new, under development.

@@ -1,17 +1,19 @@
-#include "gpe_radial.h"
-#include "fock.h"
-#include "util.h"
-#include <math.h>
+#include <tgmath.h>
 #include <string.h>
 
 #include <lapacke.h>
 #include <cblas.h>
 
+#include "gpe_radial.h"
+#include "fock.h"
+#include "state.h"
+#include "util.h"
+
 double __gpe_solve_calc_integral(const QuickFunction* chi2, uint nr_1, uint nr_2) {
-        const QuickFunction qf1 = *bessel_get_qf(nr_1);
-        const QuickFunction qf2 = *bessel_get_qf(nr_2);
-        //util_error(qf1 == NULL, "NULL pointer from bessel_get_qf(nr_1)\n");
-        //util_error(qf2 == NULL, "NULL pointer from bessel_get_qf(nr_2)\n");
+        const QuickFunction qf1 = *state_get_qf(nr_1);
+        const QuickFunction qf2 = *state_get_qf(nr_2);
+        //util_error(qf1 == NULL, "NULL pointer from state_get_qf(nr_1)\n");
+        //util_error(qf2 == NULL, "NULL pointer from state_get_qf(nr_2)\n");
         QuickFunction ifun;
         for (uint i = 0; i < QF_ARR_LEN; ++i) {
                 const double v1 = qf1.arr[i];
@@ -28,12 +30,12 @@ BesselLinear gpe_solve_m1(double gN, double* mu, double* Epp) {
         };
         for (uint i = 0; i < s; ++i) {
                 ret.w[i] = 0.0;
-                BesselWaveState bws = fock_bessel_state_direct(1, i+1);
-                ret.nrs[i] = fock_bessel_find_index(bws);
+                StateInfo si = state_info_direct(1, i+1);
+                ret.nrs[i] = state_find_index(si);
         }
         ret.w[0] = 1.0;
 
-        QuickFunction qf_chi2 = *bessel_get_qf(ret.nrs[0]);
+        QuickFunction qf_chi2 = *state_get_qf(ret.nrs[0]);
         for (uint i = 0; i < QF_ARR_LEN; ++i)
                 qf_chi2.arr[i] *= qf_chi2.arr[i]; 
 
@@ -53,7 +55,7 @@ BesselLinear gpe_solve_m1(double gN, double* mu, double* Epp) {
                                 double itgr = __gpe_solve_calc_integral(&qf_chi2, ret.nrs[n], ret.nrs[m]);
                                 H[n*s+m] = 2*M_PI*gN*itgr;
                         }
-                        H[n*s+n] += fock_single_energy(ret.nrs[n], STATE_BESSEL);
+                        H[n*s+n] += state_energy(ret.nrs[n]);
                 }
 
                 LAPACKE_dsyev(LAPACK_ROW_MAJOR, 'V', 'U', s, H, s, mis);
@@ -67,7 +69,7 @@ BesselLinear gpe_solve_m1(double gN, double* mu, double* Epp) {
                 for (uint i = 0; i < QF_ARR_LEN; ++i) {
                         double val = 0.0;
                         for (uint j = 0; j < s; ++j) {
-                                const QuickFunction *qf = bessel_get_qf(ret.nrs[j]);
+                                const QuickFunction *qf = state_get_qf(ret.nrs[j]);
                                 double ai = ret.w[j];
                                 val += ai * qf->arr[i];
                         }
@@ -91,7 +93,7 @@ BesselLinear gpe_solve_m1(double gN, double* mu, double* Epp) {
                                 double itgr = __gpe_solve_calc_integral(&qf_chi2, ret.nrs[n], ret.nrs[m]);
                                 H[n*s+m] = 2*M_PI*gN*itgr;
                         }
-                        H[n*s+n] += fock_single_energy(ret.nrs[n], STATE_BESSEL);
+                        H[n*s+n] += state_energy(ret.nrs[n]);
                 }
 
                 LAPACKE_dsyev(LAPACK_ROW_MAJOR, 'V', 'U', s, H, s, mis);
@@ -104,7 +106,7 @@ BesselLinear gpe_solve_m1(double gN, double* mu, double* Epp) {
                 for (uint j = 0; j < QF_ARR_LEN; ++j) {
                         double val = 0.0;
                         for (uint k = 0; k < s; ++k) {
-                                const QuickFunction *qf = bessel_get_qf(ret.nrs[k]);
+                                const QuickFunction *qf = state_get_qf(ret.nrs[k]);
                                 double ai = ret.w[k];
                                 val += ai * qf->arr[j];
                         }
@@ -134,7 +136,7 @@ BesselLinear gpe_solve_m1(double gN, double* mu, double* Epp) {
 QuickFunction gpe_bes_lin_get_qf(const BesselLinear* bl) {
         QuickFunction ret = { 0 };
         for (uint i = 0; i < bl->size; ++i) {
-                const QuickFunction *qf = bessel_get_qf(bl->nrs[i]);
+                const QuickFunction *qf = state_get_qf(bl->nrs[i]);
                 const double ai = bl->w[i];
                 for (uint j = 0; j < QF_ARR_LEN; ++j)
                         ret.arr[j] += ai * qf->arr[j];
@@ -174,18 +176,18 @@ UVSol bdg_solve(uint half_size, int m, double gN, double omega) {
                 .plus_family = util_malloc(sizeof(*sol.plus_family)*size),
         };
         for (uint i = 0; i < half_size; ++i) {
-                BesselWaveState ubws = fock_bessel_state_direct(m+2, i+1);
-                BesselWaveState lbws = fock_bessel_state_direct(m, i+1);
-                uint uidx = fock_bessel_find_index(ubws);
-                uint lidx = fock_bessel_find_index(lbws);
+                StateInfo usi = state_info_direct(m+2, i+1);
+                StateInfo lsi = state_info_direct(m, i+1);
+                uint uidx = state_find_index(usi);
+                uint lidx = state_find_index(lsi);
 
                 sol.types[i].isUp = true;
                 sol.types[i].nr = uidx;
                 sol.types[i+half_size].isUp = false;
                 sol.types[i+half_size].nr = lidx;
 
-                H[i*size + i] = fock_single_energy(uidx, STATE_BESSEL) - omega*(m+2) - mu;
-                H[(i+half_size)*size + (i+half_size)] = -fock_single_energy(lidx, STATE_BESSEL) + omega*m + mu;
+                H[i*size + i] = state_energy(uidx) - omega*(m+2) - mu;
+                H[(i+half_size)*size + (i+half_size)] = -state_energy(lidx) + omega*m + mu;
         }
 
         /* Fill Interaction part */

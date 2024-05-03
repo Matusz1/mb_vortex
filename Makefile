@@ -6,7 +6,7 @@ SRC_DIR = ./src
 OBJ_DIR = ./obj
 BIN_DIR = ./bin
 
-SRCS := fock.c fock_bessel.c fock_planewave.c gpe_radial.c util.c
+SRCS := fock.c gpe_radial.c quick_function.c rho.c state.c util.c testing.c examples.c
 SRCS := $(addprefix $(SRC_DIR)/,$(SRCS))
 OBJS := $(SRCS:$(SRC_DIR)/%=$(OBJ_DIR)/%.o)
 
