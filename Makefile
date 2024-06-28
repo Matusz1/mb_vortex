@@ -1,6 +1,6 @@
 CC = gcc
-CFLAGS = -std=c11 -O3 -pedantic -Wall -fopenmp
-LDLIBS = -lm -llapacke -lgsl -lgslcblas -fopenmp
+CFLAGS = -std=c11 -O3 -pedantic -Wall -fopenmp -I${WDATA}/c
+LDLIBS = -lm -llapacke -lgsl -lgslcblas -fopenmp -L${WDATA} -lwdata
 
 SRC_DIR = ./src
 OBJ_DIR = ./obj

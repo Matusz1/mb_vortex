@@ -27,9 +27,11 @@ typedef struct {
 } UVSol;
 
 BesselLinear gpe_solve_m1(double gN, double* mi, double* Epp);
+BesselLinear gpe_solve_m0(double gN, double* mi, double* Epp);
 QuickFunction gpe_bes_lin_get_qf(const BesselLinear* bl);
 
-UVSol bdg_solve(uint half_size, int m, double gN, double omega);
+UVSol bdg_solve(uint half_size, int m, double gN);
+UVSol bdg_solve_m0(uint half_size, int m, double gN);
 void uvsol_free(UVSol* uvsol);
 
 #endif

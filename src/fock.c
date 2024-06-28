@@ -17,7 +17,7 @@
 #include "util.h"
 #include "rho.h"
 
-#define FOCK_CONFIG_SET_WEIGHT_CUTOFF 1.0e-8
+#define FOCK_CONFIG_SET_WEIGHT_CUTOFF 1.0e-4
 
 /* === Fock states === */
 
@@ -499,8 +499,8 @@ DEigenSol fock_eigen_vt_solve(double g, uint n, double* T, double* V) {
                 .val = util_malloc(sizeof(*ret.val)*n)
         };
         for (uint i = 0; i < n; ++i) {
-                for (uint j = i; j < n; ++j) {
-                        ret.U[i*n+j] = T[i*n+j] + g*V[i*n+j];
+                for (uint j = 0; j < n; ++j) {
+                        ret.U[j*n+i] = T[j*n+i] + g*V[j*n+i];
                 }
         }
 	LAPACKE_zheev(LAPACK_COL_MAJOR, 'V', 'L', ret.size, ret.U, ret.size, ret.val);
