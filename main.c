@@ -1,13 +1,4 @@
-#include <math.h>
-#include <string.h>
-
-#include "src/util.h"
-#include "src/fock.h"
-#include "src/rho.h"
-#include "src/testing.h"
 #include "src/examples.h"
-#include "src/gpe_radial.h"
-#include "wdata.h"
 
 int main(int argc, char **argv) {
         /*

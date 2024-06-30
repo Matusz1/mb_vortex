@@ -1,6 +1,6 @@
 CC = gcc
-CFLAGS = -std=c11 -O3 -pedantic -Wall -fopenmp -I${WDATA}/c
-LDLIBS = -lm -llapacke -lgsl -lgslcblas -fopenmp -L${WDATA} -lwdata
+CFLAGS = -std=c11 -O3 -pedantic -Wall -fopenmp
+LDLIBS = -lm -llapacke -lgsl -lgslcblas -fopenmp
 
 SRC_DIR = ./src
 OBJ_DIR = ./obj
@@ -10,7 +10,7 @@ SRCS := fock.c gpe_radial.c quick_function.c rho.c state.c util.c testing.c exam
 SRCS := $(addprefix $(SRC_DIR)/,$(SRCS))
 OBJS := $(SRCS:$(SRC_DIR)/%=$(OBJ_DIR)/%.o)
 
-all: $(OBJ_DI) run
+all: $(OBJ_DIR) run
 
 run: $(OBJS) $(OBJ_DIR)/main.c.o
 	$(CC) $^ $(LDLIBS) -o run
