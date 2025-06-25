@@ -1,3 +1,0 @@
--lm
--I/home/mateusz/rgc/src
--I/home/mateusz/Software/wslda/lib/wdata/c/
